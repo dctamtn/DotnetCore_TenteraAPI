@@ -1,0 +1,6 @@
+@TenteraAPI_HostAddress = http://localhost:5291
+
+GET {{TenteraAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
