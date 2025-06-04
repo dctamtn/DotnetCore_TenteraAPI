@@ -36,58 +36,67 @@ The solution is organized into the following layers:
 - .NET 9.0
 - Entity Framework Core 9.0.5
 - SQL Server
-- BCrypt.Net-Next 4.0.3 (for password hashing)
 - Twilio 7.11.1 (for SMS/communication services)
 - OpenAPI/Swagger for API documentation
 
 ## Key Features
-- Clean Architecture implementation
-- RESTful API design
-- Entity Framework Core for data access
-- Secure password hashing with BCrypt
-- SMS integration with Twilio
-- API documentation with Swagger/OpenAPI
-
-## Getting Started
-
-### Prerequisites
-- .NET 9.0 SDK
-- SQL Server
-- Visual Studio 2022 or later (recommended)
-
-### Configuration
-1. Update the connection string in `appsettings.json`
-2. Configure any required API keys or secrets
-3. Run database migrations (if applicable)
-
-### Running the Application
-1. Clone the repository
-2. Restore NuGet packages
-3. Build the solution
-4. Run the application
-
-## Architecture Benefits
-- **Independence of Frameworks**: The core business logic is independent of any external frameworks
-- **Testability**: Business rules can be tested without UI, database, or external elements
-- **Independence of UI**: UI can be changed without changing the rest of the system
-- **Independence of Database**: Business rules are not bound to the database
-- **Independence of External Agency**: Business rules don't know about the outside world
-
-## Best Practices
+- Clean Architecture implementation.
 - Follow SOLID principles
-- Implement proper exception handling
 - Use dependency injection
-- Write unit tests for business logic
-- Document API endpoints
-- Implement proper logging
-- Follow security best practices
+- Implement proper logging.
+- Write unit tests for business logic.
+- RESTful API design.
+- Entity Framework Core for data access.
+- SMS integration with Twilio.
+- Google email integration with SmtpClient.
+- API documentation with Swagger/OpenAPI.
 
-## Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+### Steps to run the Application
+Step 1. UnZip project file.
+Step 2. Build the solution & Restore NuGet packages
+Step 3. Update the connection string in `appsettings.json`
+Step 4. Configure TwilioSettings for sending SMS  in `appsettings.json`
+Step 5. Configure SmtpSettings for sending email  in `appsettings.json`
+Step 6. Run database migrations 'update-database' to apply database code first.
+Step 7. Run the application
+Step 8. You can test endoints running by swapgger or import file TenteraAPI.postman_collection.json under folder 'TenteraAPI\TenteraAPI\TenteraAPI.postman_collection.json' into postman to test endpoint.
+Step 9: You can check all unittest working by open tab 'Test Explorer' then click to 'Run' to check all unitest passed & cover all API logic.
+Step 10: You can check logging file under folder "TenteraAPI\TenteraAPI\logs\tentera-*.txt" when you need check more info that happened when call APIs. 
 
-## License
- MIT License.
+
+### How to use APIs: 
+
+Each user have an IC number that was use to register/login as below:
+
+Flow 1: 
+When register user.
+	-Screen1: 
+		-User need input required info:
+			+ Customer name.
+			+ IC NUmber.
+			+ Mobile numbers.
+			+ Email address.
+		-Then user click on 'Next' button, It will call to API '/api/account/register', 
+		-This endpoint will return error message if these inputted info invalid.
+		-If inputted data is valid, UI will navigate to screen2.	
+		
+	-Screen2:
+		-On screen2 and call to API 'api/account/send-mobile-code' to get 4-digt code (It expires in 10 minutes). Then user click on 'Verify' button.
+		-User check SMS and enter 4-digit then click on 'Verify' button, It will call to API '/api/account/verify-code' to check some validation for the code. 
+			+ If It is invalid  => API return error 
+			+ If it is valid => API return success => UI navigate to screen3
+			
+	-Screen3: call to API '/api/account/send-email-code' to get 4-digt code (It expires in 10 minutes). Then user click on 'Verify' button.
+			+ If It is invalid  => API return error 
+			+ If it is valid => API return success => UI navigate to screen4			
+	-Screen4: User click on 'I agreee to terms and conditions and the Privacy Policy', then click on 'Next' button, It will call to API '/api/account/agree' to update database value to true Then it navigate to screen5		
+	-Screen5: User input 6-digit PIN then click on 'Next' button, It will call API '/api/account/create-pin' then navigate to screen6.
+		
+	-Screen6: This screen use to enable finger print and biometric.
+		-Call to API '/api/account/biometric/face' to enable biometric
+		-Call to API '/api/account/biometric/fingerprint' to enable fingerprint
+
+Flow 2: 
+	User input 'IC NUmber' then click on Login, It call to API '/api/account/login'	
+		-If login success => It will must also move to screen by screen as above(Screen2, Screen3, Screen4 Screen5)  to complete steps and call APIs then goto profile page.
+		-If login have error message => It will move to coresponding screen above to complete steps and call APIs

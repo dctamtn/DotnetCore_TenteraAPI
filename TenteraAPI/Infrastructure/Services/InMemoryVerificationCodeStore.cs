@@ -15,9 +15,17 @@ namespace TenteraAPI.Infrastructure.Services
 
         public async Task<(string Code, DateTime Expiry)?> GetCodeAsync(string key)
         {
-            _codes.TryGetValue(key, out var code);
-            return code;
-            await Task.CompletedTask;
+            if (_codes.TryGetValue(key, out var code))
+            {
+                // Check if the code has expired
+                if (code.Expiry > DateTime.UtcNow)
+                {
+                    return code;
+                }
+                // Remove expired code
+                _codes.TryRemove(key, out _);
+            }
+            return null;
         }
 
         public async Task RemoveCodeAsync(string key)

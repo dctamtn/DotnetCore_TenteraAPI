@@ -3,11 +3,10 @@ using TenteraAPI.Domain.Entities;
 using TenteraAPI.Domain.Interfaces.Repositories;
 using TenteraAPI.Domain.Interfaces.Services;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace TenteraAPI.Application.Services
 {
-    public class AccountService
+    public class AccountService : IAccountService
     {
         private readonly IAccountRepository _accountRepository;
         private readonly IEmailService _emailService;
@@ -28,13 +27,22 @@ namespace TenteraAPI.Application.Services
 
         public async Task<(bool Success, string Message, int? CustomerId)> RegisterAsync(AccountRegistrationDto dto)
         {
-            if (!string.IsNullOrEmpty(dto.ICNumber))
-                return (false, "Invalid ICNumber", null);
+			if (string.IsNullOrEmpty(dto.CustomerName))
+				return (false, "Customer Name is required", null);
 
-            if (!string.IsNullOrEmpty(dto.Email) && !IsValidEmail(dto.Email))
+			if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required", null);
+
+            if (string.IsNullOrEmpty(dto.Email))
+                return (false, "Email is required", null);
+
+            if (string.IsNullOrEmpty(dto.PhoneNumber))
+                return (false, "Phone number is required", null);
+
+            if (!IsValidEmail(dto.Email))
                 return (false, "Invalid email format", null);
 
-            if (!string.IsNullOrEmpty(dto.PhoneNumber) && !IsValidPhoneNumber(dto.PhoneNumber))
+            if (!IsValidPhoneNumber(dto.PhoneNumber))
                 return (false, "Invalid phone number format", null);
 
             if (await _accountRepository.ICNumberExistsAsync(dto.ICNumber))
@@ -43,28 +51,38 @@ namespace TenteraAPI.Application.Services
             if (await _accountRepository.EmailExistsAsync(dto.Email))
                 return (false, "Email already registered", null);
 
-            if (!string.IsNullOrEmpty(dto.PhoneNumber) && await _accountRepository.PhoneNumberExistsAsync(dto.PhoneNumber))
+            if (await _accountRepository.PhoneNumberExistsAsync(dto.PhoneNumber))
                 return (false, "Phone number already registered", null);
 
             var account = new Account
             {
-                FirstName = dto.FirstName,
-                LastName = dto.LastName,
+                CustomerName = dto.CustomerName,
                 ICNumber = dto.ICNumber,
                 Email = dto.Email,
-                PhoneNumber = dto.PhoneNumber
+                PhoneNumber = dto.PhoneNumber,
+                HasAcceptedPrivacyPolicy = dto.HasAcceptedPrivacyPolicy,
+                PinHash = string.Empty,
+                IsEmailVerified = false,
+                IsPhoneVerified = false,
+                UseFaceBiometric = false,
+                UseFingerprintBiometric = false,
+                IsFaceBiometricEnabled = false,
+                IsFingerprintBiometricEnabled = false
             };
 
             await _accountRepository.AddAsync(account);
 
-            return (true, "Customer registered successfully, verification codes sent", account.Id);
+            return (true, "Customer registered successfully.", account.Id);
         }
 
         public async Task<(bool Success, string Message)> SendEmailVerificationCodeAsync(RequestSendCodeDto info)
         {
+            if (string.IsNullOrEmpty(info.ICNumber))
+                return (false, "ICNumber is required");
+
             var account = await _accountRepository.GetICNumberAsync(info.ICNumber);
             if (account is null)
-                return (false, "account not found");
+                return (false, "Account not found");
 
             string code = GenerateCode();
             await _codeStore.StoreCodeAsync(account.Email, code, DateTime.UtcNow.AddMinutes(10));
@@ -74,9 +92,12 @@ namespace TenteraAPI.Application.Services
 
         public async Task<(bool Success, string Message)> SendMobileVerificationCodeAsync(RequestSendCodeDto info)
         {
+            if (string.IsNullOrEmpty(info.ICNumber))
+                return (false, "ICNumber is required");
+
             var account = await _accountRepository.GetICNumberAsync(info.ICNumber);
             if (account is null)
-                return (false, "account not found");
+                return (false, "Account not found");
 
             string code = GenerateCode();
             await _codeStore.StoreCodeAsync(account.PhoneNumber, code, DateTime.UtcNow.AddMinutes(10));
@@ -86,9 +107,15 @@ namespace TenteraAPI.Application.Services
 
         public async Task<(bool Success, string Message)> VerifyCodeAsync(VerifyCodeDto dto)
         {
+            if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required");
+
+            if (string.IsNullOrEmpty(dto.Code))
+                return (false, "Verification code is required");
+
             var account = await _accountRepository.GetICNumberAsync(dto.ICNumber);
             if (account is null)
-                return (false, "account not found");
+                return (false, "Account not found");
 
             string key = dto.Type == TypeVerify.EMAIL ? account.Email : account.PhoneNumber;
             var stored = await _codeStore.GetCodeAsync(key);
@@ -107,59 +134,64 @@ namespace TenteraAPI.Application.Services
             {
                 account.IsPhoneVerified = true;
             }
+            await _accountRepository.UpdateAsync(account);
             return (true, "Code verified successfully");
         }
 
         public async Task<(bool Success, string Message)> CreatePin(PinRequestDto dto)
         {
-            if (!string.IsNullOrEmpty(dto.PinHash))
-                return (false, "Invalid Pin code");
+            if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required");
+
+            if (string.IsNullOrEmpty(dto.PinHash))
+                return (false, "PIN is required");
 
             var account = await _accountRepository.GetICNumberAsync(dto.ICNumber);
             if (account == null)
-                return (false, "The IC number has not been registered yet");
+                return (false, "Account not found");
 
             if (!account.IsEmailVerified)
-                return (false, "Email has not verifed yet");
+                return (false, "Email has not been verified yet");
 
             if (!account.IsPhoneVerified)
-                return (false, "PhoneNumber has not verifed yet");
+                return (false, "Phone number has not been verified yet");
 
             if (!account.HasAcceptedPrivacyPolicy)
-                return (false, "Privacy Policy has not accepted");
-            account.PinHash = dto.PinHash;
+                return (false, "Privacy Policy has not been accepted");
 
-            return (true, "created Pin code");
+            account.PinHash = dto.PinHash;
+            await _accountRepository.UpdateAsync(account);
+            return (true, "PIN created successfully");
         }
 
         public async Task<(bool Success, string Message, int? CustomerId)> LoginAsync(LoginDto dto)
         {
-            if (!String.IsNullOrEmpty(dto.ICNumber))
-                return (false, "Invalid ICNumber", null);
+            if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required", null);
 
             var account = await _accountRepository.GetICNumberAsync(dto.ICNumber);
             if (account == null)
-                return (false, "The IC number has not been registered yet", null);
+                return (false, "Account not found", null);
 
             if (!account.IsEmailVerified)
-                return (false, "Email has not verifed yet", null);
+                return (false, "Email has not been verified yet", null);
 
             if (!account.IsPhoneVerified)
-                return (false, "PhoneNumber has not verifed yet", null);
+                return (false, "Phone number has not been verified yet", null);
 
             if (!account.HasAcceptedPrivacyPolicy)
-                return (false, "Privacy Policy has not accepted", null);
+                return (false, "Privacy Policy has not been accepted", null);
 
-            if (!String.IsNullOrEmpty(account.PinHash) && dto.PinHash == account.PinHash)
-                return (false, "Pin code has not valid", null);
+            if (string.IsNullOrEmpty(account.PinHash))
+                return (false, "PIN has not been set up", null);
 
-            if (!account.UseFaceBiometric && !account.UseFingerprintBiometric)
-                return (false, "Biometric has not been registered yet", null);
+            if (dto.PinHash != account.PinHash)
+                return (false, "Invalid PIN", null);
 
-            if (account.UseFaceBiometric && !account.IsFaceBiometricEnabled)
+            if (dto.UseFaceBiometric && !account.IsFaceBiometricEnabled)
                 return (false, "Face biometric login not enabled for this account", null);
 
-            if (account.UseFingerprintBiometric && !account.IsFingerprintBiometricEnabled)
+            if (dto.UseFingerprintBiometric && !account.IsFingerprintBiometricEnabled)
                 return (false, "Fingerprint biometric login not enabled for this account", null);
 
             return (true, "Login successful", account.Id);
@@ -167,29 +199,30 @@ namespace TenteraAPI.Application.Services
 
         public async Task<(bool Success, string Message)> ManageFaceBiometricAsync(BiometricRequestDto dto)
         {
-            if (!String.IsNullOrEmpty(dto.ICNumber))
-                return (false, "Invalid ICNumber");
+            if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required");
 
             var account = await _accountRepository.GetICNumberAsync(dto.ICNumber);
             if (account == null)
-                return (false, "Customer not found");
+                return (false, "Account not found");
+
             account.IsFaceBiometricEnabled = dto.Enable;
-            account.UseFaceBiometric = account.IsFaceBiometricEnabled;
+            account.UseFaceBiometric = dto.Enable;
             await _accountRepository.UpdateAsync(account);
             return (true, $"Face biometric {(dto.Enable ? "enabled" : "disabled")} successfully");
         }
 
         public async Task<(bool Success, string Message)> ManageFingerprintBiometricAsync(BiometricRequestDto dto)
         {
-            if (!String.IsNullOrEmpty(dto.ICNumber))
-                return (false, "Invalid ICNumber");
+            if (string.IsNullOrEmpty(dto.ICNumber))
+                return (false, "ICNumber is required");
 
             var account = await _accountRepository.GetICNumberAsync(dto.ICNumber);
             if (account == null)
-                return (false, "Customer not found");
+                return (false, "Account not found");
 
             account.IsFingerprintBiometricEnabled = dto.Enable;
-            account.UseFingerprintBiometric = account.IsFingerprintBiometricEnabled;
+            account.UseFingerprintBiometric = dto.Enable;
             await _accountRepository.UpdateAsync(account);
             return (true, $"Fingerprint biometric {(dto.Enable ? "enabled" : "disabled")} successfully");
         }
