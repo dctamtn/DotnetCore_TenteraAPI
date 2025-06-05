@@ -67,7 +67,8 @@ Step 10: You can check logging file under folder "TenteraAPI\TenteraAPI\logs\ten
 ### How to use APIs: Each user have an IC number that was use to register/login as below:
 
 Flow 1: 
-When register user.
+When register user:
+
 	-Screen1: 
 		-User need input required info:
 			+ Customer name.
