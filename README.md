@@ -53,14 +53,23 @@ The solution is organized into the following layers:
 
 ### Steps to run the Application
 Step 1. UnZip project file.
+
 Step 2. Build the solution & Restore NuGet packages
+
 Step 3. Update the connection string in `appsettings.json`
+
 Step 4. Configure TwilioSettings for sending SMS  in `appsettings.json`
+
 Step 5. Configure SmtpSettings for sending email  in `appsettings.json`
+
 Step 6. Run database migrations 'update-database' to apply database code first.
+
 Step 7. Run the application
+
 Step 8. You can test endoints running by swapgger or import file TenteraAPI.postman_collection.json under folder 'TenteraAPI\TenteraAPI\TenteraAPI.postman_collection.json' into postman to test endpoint.
+
 Step 9: You can check all unittest working by open tab 'Test Explorer' then click to 'Run' to check all unitest passed & cover all API logic.
+
 Step 10: You can check logging file under folder "TenteraAPI\TenteraAPI\logs\tentera-*.txt" when you need check more info that happened when call APIs. 
 
 
