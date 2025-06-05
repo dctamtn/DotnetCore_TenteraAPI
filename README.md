@@ -106,5 +106,7 @@ When register user:
 
 Flow 2: 
 	User input 'IC NUmber' then click on Login, It call to API '/api/account/login'	
+ 
 		-If login success => It will must also move to screen by screen as above(Screen2, Screen3, Screen4 Screen5)  to complete steps and call APIs then goto profile page.
+  
 		-If login have error message => It will move to coresponding screen above to complete steps and call APIs
